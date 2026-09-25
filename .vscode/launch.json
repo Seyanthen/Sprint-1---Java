@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Launch Gradebook App",
+            "request": "launch",
+            "mainClass": "com.gradebook.App",
+            "projectName": "gradebook-system"
+        }
+    ]
+}
