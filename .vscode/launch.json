@@ -3,10 +3,17 @@
     "configurations": [
         {
             "type": "java",
-            "name": "Launch Gradebook App",
+            "name": "App",
             "request": "launch",
             "mainClass": "com.gradebook.App",
             "projectName": "gradebook-system"
+        },
+        {
+            "type": "java",
+            "name": "Launch Gradebook App",
+            "request": "launch",
+            "mainClass": "com.gradebook.App",
+            "projectName": "gradebooksystem"
         }
     ]
 }
