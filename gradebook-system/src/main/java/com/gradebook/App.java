@@ -1,24 +1,29 @@
 package com.gradebook;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
-import javafx.stage.Stage;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 
 /**
- * Small interactive test harness for the gradebook domain model and service.
+ * Small interactive test harness for the gradebook service and persistence.
  *
- * <p>Use the buttons to exercise individual grading, group grading, and
- * resetting the in-memory sample data.</p>
+ * <p>Use the buttons to exercise grading and save/load the sample data as JSON.</p>
  */
 public class App extends Application {
     private GradebookService gradebookService;
     private TextArea output;
+    private final PersistenceService persistenceService = new PersistenceService();
+    private Path persistencePath;
 
     @Override
     public void start(Stage stage) {
@@ -49,7 +54,14 @@ public class App extends Application {
             refreshOutput();
         });
 
-        HBox actions = new HBox(10, individualGradeButton, groupGradeButton, resetButton);
+        Button saveButton = new Button("Save JSON");
+        saveButton.setOnAction(event -> saveGradebook());
+
+        Button loadButton = new Button("Load JSON");
+        loadButton.setOnAction(event -> loadGradebook());
+
+        HBox actions = new HBox(10, individualGradeButton, groupGradeButton, resetButton,
+                saveButton, loadButton);
         VBox root = new VBox(10, instructions, actions, output);
         root.setPadding(new Insets(15));
         refreshOutput();
@@ -59,6 +71,32 @@ public class App extends Application {
         stage.setTitle("Gradebook System - Service Test Harness");
         stage.setScene(scene);
         stage.show();
+    }
+
+    /** Saves the current sample gradebook to a temporary JSON file. */
+    private void saveGradebook() {
+        try {
+            persistencePath = Files.createTempFile("gradebook-", ".json");
+            persistenceService.saveGradebook(persistencePath, gradebookService);
+            output.appendText("\nSaved JSON to: " + persistencePath + "\n");
+        } catch (IOException exception) {
+            output.appendText("\nSave failed: " + exception.getMessage() + "\n");
+        }
+    }
+
+    /** Loads the last saved gradebook so persistence can be tested from the UI. */
+    private void loadGradebook() {
+        if (persistencePath == null) {
+            output.appendText("\nSave the gradebook before loading it.\n");
+            return;
+        }
+        try {
+            gradebookService = persistenceService.loadGradebook(persistencePath);
+            refreshOutput();
+            output.appendText("\nLoaded JSON from: " + persistencePath + "\n");
+        } catch (IOException exception) {
+            output.appendText("\nLoad failed: " + exception.getMessage() + "\n");
+        }
     }
 
     /** Creates predictable sample data for manually testing the service. */
