@@ -95,6 +95,26 @@ public class GradebookService {
         return grade;
     }
 
+    /** Calculates the average of all scores recorded for one student. */
+    public double calculateStudentAverage(String studentId) {
+        return requireStudent(studentId).getGrades().values().stream()
+                .mapToDouble(Grade::score)
+                .average()
+                .orElse(0.0);
+    }
+
+    /** Calculates the average score recorded by the class for one assignment. */
+    public double calculateAssignmentAverage(String assignmentId) {
+        requireAssignment(assignmentId);
+        return students.stream()
+                .map(Student::getGrades)
+                .map(grades -> grades.get(assignmentId))
+                .filter(Objects::nonNull)
+                .mapToDouble(Grade::score)
+                .average()
+                .orElse(0.0);
+    }
+
     /**
      * Gives every member of a group the same score for an assignment.
      *

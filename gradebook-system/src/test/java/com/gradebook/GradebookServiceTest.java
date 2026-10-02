@@ -60,6 +60,24 @@ public class GradebookServiceTest {
     }
 
     @Test
+    public void calculatesStudentAndAssignmentAverages() {
+        GradebookService service = new GradebookService();
+        service.addStudent(new Student("s1", "Alex"));
+        service.addStudent(new Student("s2", "Sam"));
+        service.addAssignment(new Assignment("a1", "Quiz", 100.0, false));
+        service.addAssignment(new Assignment("a2", "Project", 100.0, false));
+
+        service.gradeStudent("s1", "a1", 80.0);
+        service.gradeStudent("s1", "a2", 100.0);
+        service.gradeStudent("s2", "a1", 90.0);
+
+        assertEquals(90.0, service.calculateStudentAverage("s1"), 0.0);
+        assertEquals(85.0, service.calculateAssignmentAverage("a1"), 0.0);
+        assertEquals(100.0, service.calculateAssignmentAverage("a2"), 0.0);
+        assertEquals(90.0, service.calculateStudentAverage("s2"), 0.0);
+    }
+
+    @Test
     public void removingEntitiesCleansRelatedData() {
         GradebookService service = new GradebookService();
         service.addStudent(new Student("s1", "Alex"));

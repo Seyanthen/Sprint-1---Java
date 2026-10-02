@@ -9,6 +9,7 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -32,9 +33,18 @@ public class App extends Application {
     private final TextField studentIdField = new TextField();
     private final TextField studentNameField = new TextField();
     private final TableView<Grade> gradesTable = new TableView<>();
+    private final TextField newAssignmentIdField = new TextField();
+    private final TextField newAssignmentTitleField = new TextField();
+    private final TextField newAssignmentMaxPointsField = new TextField();
+    private final CheckBox newAssignmentGroupCheckBox = new CheckBox("Group assignment");
+    private final TextField scoreField = new TextField();
+    private final Label scoreEditorLabel = new Label("Select a student and assignment to edit a score.");
+    private final Label studentAverageLabel = new Label("Average: —");
+    private final Label assignmentAverageLabel = new Label("Class average: —");
     private final Label statusLabel = new Label("Sample gradebook loaded.");
     private GradebookService gradebookService;
     private Student selectedStudent;
+    private Assignment selectedAssignment;
 
     /** Builds the toolbar and three-panel gradebook view. */
     @Override
@@ -45,6 +55,11 @@ public class App extends Application {
         refreshLists();
         studentList.getSelectionModel().selectedItemProperty()
                 .addListener((observable, previous, current) -> populateStudentEditor(current));
+        assignmentList.getSelectionModel().selectedItemProperty()
+                .addListener((observable, previous, current) -> {
+                    updateAssignmentDetails(current);
+                    updateScoreEditor();
+                });
 
         Button importButton = new Button("Import Gradebook");
         importButton.setOnAction(event -> importGradebook(stage));
@@ -57,7 +72,8 @@ public class App extends Application {
                 createPanel("Students", studentList),
                 createPanel("Assignments", assignmentList),
                 createPanel("Groups", groupList));
-        VBox bottomPanel = new VBox(8, createStudentEditor(), statusLabel);
+        HBox detailPanels = new HBox(12, createStudentEditor(), createAssignmentDetails());
+        VBox bottomPanel = new VBox(8, detailPanels, statusLabel);
 
         BorderPane root = new BorderPane();
         root.setTop(toolbar);
@@ -95,7 +111,40 @@ public class App extends Application {
                 new Label("Student ID:"), studentIdField,
                 new Label("Name:"), studentNameField,
                 saveChangesButton);
-        return new VBox(6, new Label("Selected Student"), fields, gradesTable);
+        VBox editor = new VBox(6, new Label("Selected Student"), fields,
+                studentAverageLabel, gradesTable);
+        HBox.setHgrow(editor, Priority.ALWAYS);
+        return editor;
+    }
+
+    /** Creates the detail panel for the selected assignment. */
+    private VBox createAssignmentDetails() {
+        Button saveScoreButton = new Button("Save Score");
+        saveScoreButton.setOnAction(event -> saveStudentScore());
+        scoreField.setPromptText("Score");
+
+        VBox details = new VBox(6,
+                new Label("Selected Assignment"), assignmentAverageLabel,
+                new Label("Edit Selected Student's Score"), scoreEditorLabel,
+                new HBox(8, new Label("Score:"), scoreField, saveScoreButton),
+                createAssignmentForm());
+        HBox.setHgrow(details, Priority.ALWAYS);
+        return details;
+    }
+
+    /** Creates controls for adding a new individual or group assignment. */
+    private VBox createAssignmentForm() {
+        newAssignmentIdField.setPromptText("ID");
+        newAssignmentTitleField.setPromptText("Title");
+        newAssignmentMaxPointsField.setPromptText("Max points");
+        Button addAssignmentButton = new Button("Add Assignment");
+        addAssignmentButton.setOnAction(event -> addAssignment());
+
+        HBox fields = new HBox(8, new Label("New Assignment:"),
+                newAssignmentIdField, newAssignmentTitleField,
+                newAssignmentMaxPointsField, newAssignmentGroupCheckBox,
+                addAssignmentButton);
+        return new VBox(6, fields);
     }
 
     /** Populates or clears the editor when the student selection changes. */
@@ -104,13 +153,121 @@ public class App extends Application {
         if (student == null) {
             studentIdField.clear();
             studentNameField.clear();
+            studentAverageLabel.setText("Average: —");
             gradesTable.setItems(FXCollections.observableArrayList());
+            updateScoreEditor();
             return;
         }
 
         studentIdField.setText(student.getId());
         studentNameField.setText(student.getName());
+        studentAverageLabel.setText(formatAverage("Average", 
+                gradebookService.calculateStudentAverage(student.getId())));
         gradesTable.setItems(FXCollections.observableArrayList(student.getGrades().values()));
+        updateScoreEditor();
+    }
+
+    /** Shows the score currently recorded for the selected student and assignment. */
+    private void updateScoreEditor() {
+        if (selectedStudent == null || selectedAssignment == null) {
+            scoreEditorLabel.setText("Select a student and assignment to edit a score.");
+            scoreField.clear();
+            return;
+        }
+        scoreEditorLabel.setText(selectedStudent.getName() + " / " + selectedAssignment.title());
+        Grade grade = selectedStudent.getGrade(selectedAssignment.id());
+        if (grade == null) {
+            scoreField.clear();
+            scoreField.setPromptText("No score yet");
+        } else {
+            scoreField.setText(Double.toString(grade.score()));
+        }
+    }
+
+    /** Validates and saves a score for the selected student and assignment. */
+    private void saveStudentScore() {
+        if (selectedStudent == null || selectedAssignment == null) {
+            statusLabel.setText("Select both a student and assignment first.");
+            return;
+        }
+        double score;
+        try {
+            score = Double.parseDouble(scoreField.getText().trim());
+        } catch (NumberFormatException exception) {
+            statusLabel.setText("Score must be a number.");
+            return;
+        }
+        if (!Double.isFinite(score) || score < 0.0 || score > selectedAssignment.maxPoints()) {
+            statusLabel.setText("Score must be between 0 and "
+                    + selectedAssignment.maxPoints() + ".");
+            return;
+        }
+
+        gradebookService.gradeStudent(selectedStudent.getId(), selectedAssignment.id(), score);
+        populateStudentEditor(selectedStudent);
+        updateAssignmentDetails(selectedAssignment);
+        statusLabel.setText("Saved " + selectedAssignment.id() + " for " + selectedStudent.getId() + ".");
+    }
+
+    /** Validates and adds the assignment entered in the assignment form. */
+    private void addAssignment() {
+        String id = newAssignmentIdField.getText().trim();
+        String title = newAssignmentTitleField.getText().trim();
+        double maxPoints;
+        try {
+            maxPoints = Double.parseDouble(newAssignmentMaxPointsField.getText().trim());
+        } catch (NumberFormatException exception) {
+            statusLabel.setText("Maximum points must be a number.");
+            return;
+        }
+        if (id.isEmpty() || title.isEmpty()) {
+            statusLabel.setText("Assignment ID and title are required.");
+            return;
+        }
+        if (!Double.isFinite(maxPoints) || maxPoints <= 0.0) {
+            statusLabel.setText("Maximum points must be greater than zero.");
+            return;
+        }
+
+        try {
+            gradebookService.addAssignment(new Assignment(id, title, maxPoints,
+                    newAssignmentGroupCheckBox.isSelected()));
+        } catch (IllegalArgumentException exception) {
+            statusLabel.setText(exception.getMessage());
+            return;
+        }
+
+        clearAssignmentForm();
+        refreshLists();
+        assignmentList.getItems().stream()
+                .filter(assignment -> assignment.id().equals(id))
+                .findFirst()
+                .ifPresent(assignment -> assignmentList.getSelectionModel().select(assignment));
+        statusLabel.setText("Added assignment " + id + ".");
+    }
+
+    /** Clears the new-assignment form after a successful add. */
+    private void clearAssignmentForm() {
+        newAssignmentIdField.clear();
+        newAssignmentTitleField.clear();
+        newAssignmentMaxPointsField.clear();
+        newAssignmentGroupCheckBox.setSelected(false);
+    }
+
+    /** Updates the assignment detail panel when an assignment is selected. */
+    private void updateAssignmentDetails(Assignment assignment) {
+        selectedAssignment = assignment;
+        if (assignment == null) {
+            assignmentAverageLabel.setText("Class average: —");
+            return;
+        }
+        assignmentAverageLabel.setText(formatAverage("Class average",
+                gradebookService.calculateAssignmentAverage(assignment.id())));
+    }
+
+    /** Formats a statistic consistently in the detail panels. */
+    private String formatAverage(String label, double average) {
+        return String.format("%s: %.2f", label, average);
     }
 
     /** Saves the edited name for the selected student and refreshes the list. */
@@ -167,6 +324,7 @@ public class App extends Application {
     /** Copies the current service data into the three visible lists. */
     private void refreshLists() {
         String selectedStudentId = selectedStudent == null ? null : selectedStudent.getId();
+        String selectedAssignmentId = selectedAssignment == null ? null : selectedAssignment.id();
         studentList.setItems(FXCollections.observableArrayList(gradebookService.getStudents()));
         assignmentList.setItems(FXCollections.observableArrayList(gradebookService.getAssignments()));
         groupList.setItems(FXCollections.observableArrayList(gradebookService.getGroups()));
@@ -179,6 +337,16 @@ public class App extends Application {
                     .ifPresentOrElse(
                             student -> studentList.getSelectionModel().select(student),
                             () -> populateStudentEditor(null));
+        }
+        if (selectedAssignmentId == null) {
+            updateAssignmentDetails(null);
+        } else {
+            assignmentList.getItems().stream()
+                    .filter(assignment -> assignment.id().equals(selectedAssignmentId))
+                    .findFirst()
+                    .ifPresentOrElse(
+                            assignment -> assignmentList.getSelectionModel().select(assignment),
+                            () -> updateAssignmentDetails(null));
         }
     }
 

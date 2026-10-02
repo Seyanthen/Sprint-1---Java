@@ -21,7 +21,9 @@ public class Group {
         this.groupId = Objects.requireNonNull(groupId, "groupId");
         this.groupName = Objects.requireNonNull(groupName, "groupName");
         this.studentIds = new LinkedHashSet<>();
-        studentIds.forEach(this::addStudent);
+        for (String studentId : studentIds) {
+            this.studentIds.add(Objects.requireNonNull(studentId, "studentId"));
+        }
     }
 
     public String getGroupId() {
