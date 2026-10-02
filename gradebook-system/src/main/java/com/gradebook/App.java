@@ -7,17 +7,20 @@ import java.util.List;
 import javafx.application.Application;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
+import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.Separator;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToolBar;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -33,7 +36,6 @@ public class App extends Application {
     private final TextField studentIdField = new TextField();
     private final TextField studentNameField = new TextField();
     private final TableView<Grade> gradesTable = new TableView<>();
-    private final TextField newAssignmentIdField = new TextField();
     private final TextField newAssignmentTitleField = new TextField();
     private final TextField newAssignmentMaxPointsField = new TextField();
     private final CheckBox newAssignmentGroupCheckBox = new CheckBox("Group assignment");
@@ -76,6 +78,7 @@ public class App extends Application {
         VBox bottomPanel = new VBox(8, detailPanels, statusLabel);
 
         BorderPane root = new BorderPane();
+        root.setPadding(new Insets(12));
         root.setTop(toolbar);
         root.setCenter(panels);
         root.setBottom(bottomPanel);
@@ -95,10 +98,19 @@ public class App extends Application {
         TableColumn<Grade, String> assignmentColumn = new TableColumn<>("Assignment");
         assignmentColumn.setCellValueFactory(cell ->
                 new SimpleStringProperty(cell.getValue().assignmentId()));
-        TableColumn<Grade, String> scoreColumn = new TableColumn<>("Score");
-        scoreColumn.setCellValueFactory(cell ->
+        TableColumn<Grade, String> gradeColumn = new TableColumn<>("Grade");
+        gradeColumn.setCellValueFactory(cell ->
                 new SimpleStringProperty(Double.toString(cell.getValue().score())));
-        gradesTable.getColumns().setAll(List.of(assignmentColumn, scoreColumn));
+        TableColumn<Grade, String> maxScoreColumn = new TableColumn<>("Max Score");
+        maxScoreColumn.setCellValueFactory(cell -> {
+            String assignmentId = cell.getValue().assignmentId();
+            return new SimpleStringProperty(gradebookService.getAssignments().stream()
+                    .filter(assignment -> assignment.id().equals(assignmentId))
+                    .map(assignment -> Double.toString(assignment.maxPoints()))
+                    .findFirst()
+                    .orElse(""));
+        });
+        gradesTable.getColumns().setAll(List.of(assignmentColumn, gradeColumn, maxScoreColumn));
         gradesTable.setPlaceholder(new Label("Select a student to view grades."));
         gradesTable.setPrefHeight(120);
     }
@@ -107,10 +119,14 @@ public class App extends Application {
     private VBox createStudentEditor() {
         Button saveChangesButton = new Button("Save Changes");
         saveChangesButton.setOnAction(event -> saveStudentChanges());
-        HBox fields = new HBox(8,
-                new Label("Student ID:"), studentIdField,
-                new Label("Name:"), studentNameField,
-                saveChangesButton);
+        GridPane fields = new GridPane();
+        fields.setHgap(8);
+        fields.setVgap(4);
+        fields.add(new Label("Student ID:"), 0, 0);
+        fields.add(new Label("Name:"), 1, 0);
+        fields.add(studentIdField, 0, 1);
+        fields.add(studentNameField, 1, 1);
+        fields.add(saveChangesButton, 2, 1);
         VBox editor = new VBox(6, new Label("Selected Student"), fields,
                 studentAverageLabel, gradesTable);
         HBox.setHgrow(editor, Priority.ALWAYS);
@@ -126,7 +142,8 @@ public class App extends Application {
         VBox details = new VBox(6,
                 new Label("Selected Assignment"), assignmentAverageLabel,
                 new Label("Edit Selected Student's Score"), scoreEditorLabel,
-                new HBox(8, new Label("Score:"), scoreField, saveScoreButton),
+                new HBox(8, new Label("Grade:"), scoreField, saveScoreButton),
+                new Separator(),
                 createAssignmentForm());
         HBox.setHgrow(details, Priority.ALWAYS);
         return details;
@@ -134,17 +151,17 @@ public class App extends Application {
 
     /** Creates controls for adding a new individual or group assignment. */
     private VBox createAssignmentForm() {
-        newAssignmentIdField.setPromptText("ID");
         newAssignmentTitleField.setPromptText("Title");
         newAssignmentMaxPointsField.setPromptText("Max points");
         Button addAssignmentButton = new Button("Add Assignment");
         addAssignmentButton.setOnAction(event -> addAssignment());
 
-        HBox fields = new HBox(8, new Label("New Assignment:"),
-                newAssignmentIdField, newAssignmentTitleField,
+        HBox firstRow = new HBox(8, new Label("New Assignment Title:"),
+                newAssignmentTitleField);
+        HBox secondRow = new HBox(8, new Label("Max points:"),
                 newAssignmentMaxPointsField, newAssignmentGroupCheckBox,
                 addAssignmentButton);
-        return new VBox(6, fields);
+        return new VBox(6, firstRow, secondRow);
     }
 
     /** Populates or clears the editor when the student selection changes. */
@@ -211,7 +228,6 @@ public class App extends Application {
 
     /** Validates and adds the assignment entered in the assignment form. */
     private void addAssignment() {
-        String id = newAssignmentIdField.getText().trim();
         String title = newAssignmentTitleField.getText().trim();
         double maxPoints;
         try {
@@ -220,8 +236,8 @@ public class App extends Application {
             statusLabel.setText("Maximum points must be a number.");
             return;
         }
-        if (id.isEmpty() || title.isEmpty()) {
-            statusLabel.setText("Assignment ID and title are required.");
+        if (title.isEmpty()) {
+            statusLabel.setText("Assignment title is required.");
             return;
         }
         if (!Double.isFinite(maxPoints) || maxPoints <= 0.0) {
@@ -229,6 +245,7 @@ public class App extends Application {
             return;
         }
 
+        String id = nextAssignmentId();
         try {
             gradebookService.addAssignment(new Assignment(id, title, maxPoints,
                     newAssignmentGroupCheckBox.isSelected()));
@@ -248,10 +265,26 @@ public class App extends Application {
 
     /** Clears the new-assignment form after a successful add. */
     private void clearAssignmentForm() {
-        newAssignmentIdField.clear();
         newAssignmentTitleField.clear();
         newAssignmentMaxPointsField.clear();
         newAssignmentGroupCheckBox.setSelected(false);
+    }
+
+    /** Returns the next sequential assignment ID in the a1, a2, a3 format. */
+    private String nextAssignmentId() {
+        long highestId = gradebookService.getAssignments().stream()
+                .map(Assignment::id)
+                .filter(id -> id.matches("a\\d+"))
+                .mapToLong(id -> {
+                    try {
+                        return Long.parseLong(id.substring(1));
+                    } catch (NumberFormatException exception) {
+                        return 0L;
+                    }
+                })
+                .max()
+                .orElse(0L);
+        return "a" + (highestId + 1);
     }
 
     /** Updates the assignment detail panel when an assignment is selected. */
@@ -309,7 +342,8 @@ public class App extends Application {
             @Override
             protected void updateItem(Assignment assignment, boolean empty) {
                 super.updateItem(assignment, empty);
-                setText(empty || assignment == null ? null : assignment.id() + " - " + assignment.title());
+                setText(empty || assignment == null ? null : assignment.id() + " - "
+                        + assignment.title() + " (Max: " + assignment.maxPoints() + ")");
             }
         });
         groupList.setCellFactory(list -> new ListCell<>() {
@@ -391,7 +425,12 @@ public class App extends Application {
         GradebookService service = new GradebookService();
         service.addStudent(new Student("s1", "Alex"));
         service.addStudent(new Student("s2", "Sam"));
+        service.addStudent(new Student("s3", "Jordan"));
+        service.addStudent(new Student("s4", "Taylor"));
+        service.addStudent(new Student("s5", "Morgan"));
         service.addAssignment(new Assignment("a1", "Team Project", 100.0, true));
+        service.addAssignment(new Assignment("a2", "Midterm Exam", 80.0, false));
+        service.addAssignment(new Assignment("a3", "Final Presentation", 50.0, true));
         service.addGroup(new Group("g1", "Blue Group"));
         service.addStudentToGroup("g1", "s1");
         service.addStudentToGroup("g1", "s2");

@@ -1,0 +1,98 @@
+{
+  "students" : [ {
+    "id" : "s1",
+    "name" : "Alex",
+    "grades" : {
+      "a1" : {
+        "assignmentId" : "a1",
+        "score" : 89.0
+      },
+      "a3" : {
+        "assignmentId" : "a3",
+        "score" : 50.0
+      }
+    }
+  }, {
+    "id" : "s2",
+    "name" : "Sam",
+    "grades" : {
+      "a1" : {
+        "assignmentId" : "a1",
+        "score" : 97.0
+      },
+      "a4" : {
+        "assignmentId" : "a4",
+        "score" : 30.0
+      }
+    }
+  }, {
+    "id" : "s3",
+    "name" : "Jordan",
+    "grades" : {
+      "a2" : {
+        "assignmentId" : "a2",
+        "score" : 78.0
+      },
+      "a1" : {
+        "assignmentId" : "a1",
+        "score" : 100.0
+      },
+      "a3" : {
+        "assignmentId" : "a3",
+        "score" : 34.0
+      }
+    }
+  }, {
+    "id" : "s4",
+    "name" : "Taylor",
+    "grades" : {
+      "a4" : {
+        "assignmentId" : "a4",
+        "score" : 25.0
+      },
+      "a1" : {
+        "assignmentId" : "a1",
+        "score" : 96.0
+      }
+    }
+  }, {
+    "id" : "s5",
+    "name" : "Morgan",
+    "grades" : {
+      "a1" : {
+        "assignmentId" : "a1",
+        "score" : 50.0
+      },
+      "a3" : {
+        "assignmentId" : "a3",
+        "score" : 50.0
+      }
+    }
+  } ],
+  "assignments" : [ {
+    "id" : "a1",
+    "title" : "Team Project",
+    "maxPoints" : 100.0,
+    "isGroupAssignment" : true
+  }, {
+    "id" : "a2",
+    "title" : "Midterm Exam",
+    "maxPoints" : 80.0,
+    "isGroupAssignment" : false
+  }, {
+    "id" : "a3",
+    "title" : "Final Presentation",
+    "maxPoints" : 50.0,
+    "isGroupAssignment" : true
+  }, {
+    "id" : "a4",
+    "title" : "Lecture Notes",
+    "maxPoints" : 30.0,
+    "isGroupAssignment" : false
+  } ],
+  "groups" : [ {
+    "groupId" : "g1",
+    "groupName" : "Blue Group",
+    "studentIds" : [ "s1", "s2" ]
+  } ]
+}
