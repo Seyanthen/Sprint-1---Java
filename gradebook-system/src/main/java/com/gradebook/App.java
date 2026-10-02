@@ -51,10 +51,13 @@ public class App extends Application {
     /** Builds the toolbar and three-panel gradebook view. */
     @Override
     public void start(Stage stage) {
+        // Build the initial in-memory model before configuring controls that read from it.
         gradebookService = createSampleGradebook();
         configureListCells();
         configureStudentEditor();
         refreshLists();
+
+        // Keep the editors synchronized with the selected student and assignment.
         studentList.getSelectionModel().selectedItemProperty()
                 .addListener((observable, previous, current) -> populateStudentEditor(current));
         assignmentList.getSelectionModel().selectedItemProperty()
@@ -104,6 +107,7 @@ public class App extends Application {
         TableColumn<Grade, String> maxScoreColumn = new TableColumn<>("Max Score");
         maxScoreColumn.setCellValueFactory(cell -> {
             String assignmentId = cell.getValue().assignmentId();
+            // Grades store an assignment ID, so resolve it to show the assignment's limit.
             return new SimpleStringProperty(gradebookService.getAssignments().stream()
                     .filter(assignment -> assignment.id().equals(assignmentId))
                     .map(assignment -> Double.toString(assignment.maxPoints()))
@@ -168,6 +172,7 @@ public class App extends Application {
     private void populateStudentEditor(Student student) {
         selectedStudent = student;
         if (student == null) {
+            // Clear all student-specific controls when the selection is removed.
             studentIdField.clear();
             studentNameField.clear();
             studentAverageLabel.setText("Average: —");
@@ -178,6 +183,7 @@ public class App extends Application {
 
         studentIdField.setText(student.getId());
         studentNameField.setText(student.getName());
+        // Recalculate the average and replace the table rows for the new selection.
         studentAverageLabel.setText(formatAverage("Average", 
                 gradebookService.calculateStudentAverage(student.getId())));
         gradesTable.setItems(FXCollections.observableArrayList(student.getGrades().values()));
@@ -209,6 +215,7 @@ public class App extends Application {
         }
         double score;
         try {
+            // Parse and validate before changing the gradebook so invalid input is harmless.
             score = Double.parseDouble(scoreField.getText().trim());
         } catch (NumberFormatException exception) {
             statusLabel.setText("Score must be a number.");
@@ -220,6 +227,7 @@ public class App extends Application {
             return;
         }
 
+        // The service replaces an existing grade for the same student and assignment.
         gradebookService.gradeStudent(selectedStudent.getId(), selectedAssignment.id(), score);
         populateStudentEditor(selectedStudent);
         updateAssignmentDetails(selectedAssignment);
@@ -357,6 +365,7 @@ public class App extends Application {
 
     /** Copies the current service data into the three visible lists. */
     private void refreshLists() {
+        // Save IDs before replacing list items so the current selections can be restored.
         String selectedStudentId = selectedStudent == null ? null : selectedStudent.getId();
         String selectedAssignmentId = selectedAssignment == null ? null : selectedAssignment.id();
         studentList.setItems(FXCollections.observableArrayList(gradebookService.getStudents()));
@@ -394,6 +403,7 @@ public class App extends Application {
             return;
         }
         try {
+            // Replace the active model only after the file has been read successfully.
             gradebookService = persistenceService.loadGradebook(file.toPath());
             refreshLists();
             statusLabel.setText("Imported: " + file.getName());
@@ -412,6 +422,7 @@ public class App extends Application {
             return;
         }
         try {
+            // Use the persistence service so JSON formatting stays consistent with imports.
             Path path = file.toPath();
             persistenceService.saveGradebook(path, gradebookService);
             statusLabel.setText("Saved: " + file.getName());

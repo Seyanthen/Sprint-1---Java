@@ -22,6 +22,7 @@ public class PersistenceService {
         Objects.requireNonNull(path, "path");
         Objects.requireNonNull(service, "service");
 
+        // UTF-8 keeps exported gradebooks portable across operating systems.
         try (var writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
             objectMapper.writeValue(writer, service);
         }
@@ -32,6 +33,7 @@ public class PersistenceService {
         Objects.requireNonNull(path, "path");
 
         try (var reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+            // Deserialize into snapshots, then rebuild the domain model through its public API.
             GradebookSnapshot snapshot = objectMapper.readValue(reader, GradebookSnapshot.class);
             GradebookService service = new GradebookService();
             snapshot.students().forEach(student -> service.addStudent(

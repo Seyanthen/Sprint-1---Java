@@ -35,6 +35,7 @@ public class GradebookService {
 
     public void addStudent(Student student) {
         Objects.requireNonNull(student, "student");
+        // IDs are the stable keys used by groups and grades, so they must be unique.
         if (findStudent(student.getId()) != null) {
             throw new IllegalArgumentException("Student ID already exists: " + student.getId());
         }
@@ -44,6 +45,7 @@ public class GradebookService {
     /** Removes a student and clears that student's ID from every group. */
     public boolean removeStudent(String studentId) {
         Student student = requireStudent(studentId);
+        // Remove the ID from groups before removing the student itself.
         groups.forEach(group -> group.removeStudent(student.getId()));
         return students.remove(student);
     }
@@ -90,6 +92,7 @@ public class GradebookService {
     public Grade gradeStudent(String studentId, String assignmentId, double score) {
         Student student = requireStudent(studentId);
         Assignment assignment = requireAssignment(assignmentId);
+        // Student.addGrade replaces an older grade for the same assignment.
         Grade grade = new Grade(assignment.id(), score);
         student.addGrade(grade);
         return grade;
@@ -128,11 +131,13 @@ public class GradebookService {
         Assignment assignment = requireAssignment(assignmentId);
         Map<String, Student> members = new LinkedHashMap<>();
 
+        // Resolve every member first so a missing ID cannot cause a partial update.
         for (String studentId : group.getStudentIds()) {
             members.put(studentId, requireStudent(studentId));
         }
 
         Map<String, Grade> recordedGrades = new LinkedHashMap<>();
+        // Write grades only after all group members have been validated.
         for (Map.Entry<String, Student> member : members.entrySet()) {
             Grade grade = new Grade(assignment.id(), score);
             member.getValue().addGrade(grade);
